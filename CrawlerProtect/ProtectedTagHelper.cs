@@ -11,10 +11,11 @@ namespace CrawlerProtect;
 /// <code>&lt;protected class="protected-lnk"&gt;user@example.com&lt;/protected&gt;</code>
 /// </para>
 /// <para>
-/// Example output:
+/// Example output (default options):
 /// <code>&lt;a class="protected-lnk" data-protected="42*424f464645"&gt;[Protected]&lt;/a&gt;</code>
 /// </para>
-/// The companion <c>decode.js</c> reverses the XOR encoding client-side for real users.
+/// The companion script served by <c>app.MapCrawlerProtectDecoder()</c> reverses
+/// the XOR encoding client-side for real users.
 /// </summary>
 [HtmlTargetElement("protected", TagStructure = TagStructure.NormalOrSelfClosing)]
 public class ProtectedTagHelper : TagHelper
@@ -33,49 +34,76 @@ public class ProtectedTagHelper : TagHelper
     [HtmlAttributeName("href")]
     public string LinkTarget { get; set; }
 
+    private readonly CrawlerProtectOptions _options;
+
     public ProtectedTagHelper(IOptions<CrawlerProtectOptions> options)
     {
-        Placeholder = options.Value.DefaultPlaceholder;
-        LinkTarget  = options.Value.DefaultLinkTarget;
+        _options    = options.Value;
+        Placeholder = _options.DefaultPlaceholder;
+        LinkTarget  = _options.DefaultLinkTarget;
     }
 
     /// <inheritdoc/>
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var content = (await output.GetChildContentAsync()).GetContent();
-        var encoded = EncodeString(content, Random.Shared.Next(1, 256));
+        var encoded = EncodeString(content, Random.Shared.Next(1, 256), _options);
 
         output.TagName = "a";
         output.Attributes.RemoveAll("placeholder");
-        output.Attributes.SetAttribute("data-protected", encoded);
+        output.Attributes.SetAttribute(_options.DataAttribute, encoded);
         output.Content.SetContent(Placeholder);
     }
 
     /// <summary>
-    /// XOR-encodes <paramref name="str"/> with <paramref name="key"/> and returns the result
-    /// as <c>key*hexstring</c>.
+    /// XOR-encodes <paramref name="str"/> with <paramref name="key"/> using default options.
+    /// Returns the result as <c>key*hexstring</c> (backward-compatible).
     /// </summary>
     /// <param name="str">The plaintext to encode.</param>
     /// <param name="key">XOR key in the range [1, 255].</param>
-    /// <returns>Encoded string in the format <c>key*hexstring</c>.</returns>
+    public static string EncodeString(string str, int key)
+        => EncodeString(str, key, new CrawlerProtectOptions());
+
+    /// <summary>
+    /// XOR-encodes <paramref name="str"/> with <paramref name="key"/> according to
+    /// <paramref name="options"/>. The output format is governed by
+    /// <see cref="CrawlerProtectOptions.Separator"/>,
+    /// <see cref="CrawlerProtectOptions.KeyPosition"/>, and
+    /// <see cref="CrawlerProtectOptions.PayloadEncoding"/>.
+    /// </summary>
+    /// <param name="str">The plaintext to encode.</param>
+    /// <param name="key">XOR key in the range [1, 255].</param>
+    /// <param name="options">Format options that control the output structure.</param>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="key"/> is outside [1, 255].
     /// </exception>
-    public static string EncodeString(string str, int key)
+    public static string EncodeString(string str, int key, CrawlerProtectOptions options)
     {
         if (key < 1 || key > 255)
             throw new ArgumentOutOfRangeException(nameof(key), "Key must be in the range [1, 255].");
 
-        var bytes = Encoding.UTF8.GetBytes(str);
-        var encrypted = new StringBuilder(bytes.Length * 2 + 4);
+        var bytes   = Encoding.UTF8.GetBytes(str);
+        var payload = BuildPayload(bytes, key, options.PayloadEncoding);
 
-        foreach (var b in bytes)
+        return options.KeyPosition == KeyPosition.Before
+            ? $"{key}{options.Separator}{payload}"
+            : $"{payload}{options.Separator}{key}";
+    }
+
+    private static string BuildPayload(byte[] bytes, int key, PayloadEncoding encoding)
+    {
+        if (encoding == PayloadEncoding.Base64)
         {
-            // Each UTF-8 byte is in [0, 255], so XOR with key ∈ [1, 255]
-            // always yields a value in [0, 255] → exactly 2 hex digits.
-            encrypted.Append((b ^ key).ToString("x2"));
+            var xored = new byte[bytes.Length];
+            for (int i = 0; i < bytes.Length; i++)
+                xored[i] = (byte)(bytes[i] ^ key);
+            return Convert.ToBase64String(xored);
         }
 
-        return key + "*" + encrypted;
+        // Hex (default): each UTF-8 byte XORed with key → 2 lowercase hex digits
+        var sb = new StringBuilder(bytes.Length * 2);
+        foreach (var b in bytes)
+            sb.Append((b ^ key).ToString("x2"));
+        return sb.ToString();
     }
 }
