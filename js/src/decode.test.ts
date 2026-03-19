@@ -3,11 +3,14 @@ import { decodeStr, parse_protectedLnk, parse_protectedStr } from "./decode";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-/** Reproduce the C# EncodeString logic so tests are self-contained. */
+/** Reproduce the C# EncodeString logic so tests are self-contained.
+ *  The string is UTF-8 encoded; each byte is XOR-ed with the key.
+ */
 function encode(str: string, key: number): string {
+  const bytes = new TextEncoder().encode(str); // UTF-8 bytes
   let hex = "";
-  for (const ch of str) {
-    hex += (ch.charCodeAt(0) ^ key).toString(16).padStart(2, "0");
+  for (const b of bytes) {
+    hex += (b ^ key).toString(16).padStart(2, "0");
   }
   return `${key}*${hex}`;
 }
@@ -25,7 +28,12 @@ describe("decodeStr", () => {
       ["test@example.com", 42],
       ["hello world", 1],
       ["sensitive data", 255],
+      // Latin Extended (U+0080–U+00FF) — 2-byte UTF-8 sequences
       ["café", 100],
+      // Beyond Latin-1 (code points > U+00FF) — was broken before UTF-8 fix
+      ["Ω résumé €", 50],        // U+03A9, U+20AC
+      ["中文 日本語", 77],          // CJK characters
+      ["emoji 🎉", 128],          // 4-byte UTF-8 sequence (U+1F389)
     ];
     for (const [text, key] of cases) {
       expect(decodeStr(encode(text, key))).toBe(text);

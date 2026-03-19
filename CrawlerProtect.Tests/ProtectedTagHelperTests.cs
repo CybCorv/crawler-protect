@@ -26,7 +26,12 @@ public class EncodeStringTests
     [InlineData("test@example.com", 42)]
     [InlineData("hello world", 1)]
     [InlineData("sensitive data", 255)]
+    // Latin Extended (U+0080–U+00FF) — 2-byte UTF-8
     [InlineData("café", 100)]
+    // Beyond Latin-1 (> U+00FF) — was broken before UTF-8 fix
+    [InlineData("Ω résumé €", 50)]
+    [InlineData("中文 日本語", 77)]
+    [InlineData("emoji 🎉", 128)]
     public void EncodeString_IsSymmetricWithXor(string input, int key)
     {
         var encoded = ProtectedTagHelper.EncodeString(input, key);
@@ -34,14 +39,14 @@ public class EncodeStringTests
         var sep = encoded.IndexOf('*');
         var hexStr = encoded[(sep + 1)..];
 
-        var decoded = new StringBuilder();
+        // Decode hex pairs back to UTF-8 bytes, then decode the bytes to string
+        var bytes = new byte[hexStr.Length / 2];
         for (int i = 0; i < hexStr.Length; i += 2)
         {
-            var charCode = Convert.ToInt32(hexStr.Substring(i, 2), 16) ^ key;
-            decoded.Append((char)charCode);
+            bytes[i / 2] = (byte)(Convert.ToInt32(hexStr.Substring(i, 2), 16) ^ key);
         }
 
-        Assert.Equal(input, decoded.ToString());
+        Assert.Equal(input, Encoding.UTF8.GetString(bytes));
     }
 
     [Fact]
@@ -194,13 +199,10 @@ public class ProtectedTagHelperProcessTests
         var key = int.Parse(attr[..sep]);
         var hex = attr[(sep + 1)..];
 
-        var decoded = new StringBuilder();
+        var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < hex.Length; i += 2)
-        {
-            var charCode = Convert.ToInt32(hex.Substring(i, 2), 16) ^ key;
-            decoded.Append((char)charCode);
-        }
+            bytes[i / 2] = (byte)(Convert.ToInt32(hex.Substring(i, 2), 16) ^ key);
 
-        Assert.Equal(email, decoded.ToString());
+        Assert.Equal(email, Encoding.UTF8.GetString(bytes));
     }
 }

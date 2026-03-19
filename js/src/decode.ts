@@ -10,12 +10,12 @@ export function decodeStr(encrypted: string): string {
   const key = parseInt(encrypted.substring(0, separatorIndex), 10);
   const encryptedData = encrypted.substring(separatorIndex + 1);
 
-  let result = "";
+  // Each hex pair is a XOR-encoded UTF-8 byte → reverse to get the original bytes.
+  const bytes = new Uint8Array(encryptedData.length / 2);
   for (let i = 0; i < encryptedData.length; i += 2) {
-    const hexChar = encryptedData.substring(i, i + 2);
-    result += String.fromCharCode(parseInt(hexChar, 16) ^ key);
+    bytes[i / 2] = parseInt(encryptedData.substring(i, i + 2), 16) ^ key;
   }
-  return result;
+  return new TextDecoder().decode(bytes);
 }
 
 /**

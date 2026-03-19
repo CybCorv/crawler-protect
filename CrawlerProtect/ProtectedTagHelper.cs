@@ -59,12 +59,14 @@ public class ProtectedTagHelper : TagHelper
         if (key < 1 || key > 255)
             throw new ArgumentOutOfRangeException(nameof(key), "Key must be in the range [1, 255].");
 
-        var encrypted = new StringBuilder(str.Length * 2 + 4);
+        var bytes = Encoding.UTF8.GetBytes(str);
+        var encrypted = new StringBuilder(bytes.Length * 2 + 4);
 
-        foreach (var c in str)
+        foreach (var b in bytes)
         {
-            var encryptedChar = (int)c ^ key;
-            encrypted.Append(encryptedChar.ToString("x2"));
+            // Each UTF-8 byte is in [0, 255], so XOR with key ∈ [1, 255]
+            // always yields a value in [0, 255] → exactly 2 hex digits.
+            encrypted.Append((b ^ key).ToString("x2"));
         }
 
         return key + "*" + encrypted;
