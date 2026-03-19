@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace CrawlerProtect.Tests;
@@ -103,6 +104,9 @@ public class EncodeStringTests
 
 public class ProtectedTagHelperProcessTests
 {
+    private static readonly IOptions<CrawlerProtectOptions> DefaultOptions =
+        Options.Create(new CrawlerProtectOptions());
+
     private static TagHelperContext MakeContext() =>
         new(
             tagName: "protected",
@@ -128,7 +132,7 @@ public class ProtectedTagHelperProcessTests
     [Fact]
     public async Task ProcessAsync_ChangesTagNameToAnchor()
     {
-        var helper = new ProtectedTagHelper();
+        var helper = new ProtectedTagHelper(DefaultOptions);
         var output = MakeOutput("user@example.com");
 
         await helper.ProcessAsync(MakeContext(), output);
@@ -139,7 +143,7 @@ public class ProtectedTagHelperProcessTests
     [Fact]
     public async Task ProcessAsync_SetsDataProtectedAttribute()
     {
-        var helper = new ProtectedTagHelper();
+        var helper = new ProtectedTagHelper(DefaultOptions);
         var output = MakeOutput("user@example.com");
 
         await helper.ProcessAsync(MakeContext(), output);
@@ -152,7 +156,7 @@ public class ProtectedTagHelperProcessTests
     [Fact]
     public async Task ProcessAsync_ContentIsPlaceholder()
     {
-        var helper = new ProtectedTagHelper { Placeholder = "[Email]" };
+        var helper = new ProtectedTagHelper(DefaultOptions) { Placeholder = "[Email]" };
         var output = MakeOutput("user@example.com");
 
         await helper.ProcessAsync(MakeContext(), output);
@@ -163,7 +167,7 @@ public class ProtectedTagHelperProcessTests
     [Fact]
     public async Task ProcessAsync_RemovesPlaceholderAttribute()
     {
-        var helper = new ProtectedTagHelper();
+        var helper = new ProtectedTagHelper(DefaultOptions);
         var attrs = new TagHelperAttributeList { { "placeholder", "[Hidden]" } };
         var output = MakeOutput("data", attrs);
 
@@ -175,7 +179,7 @@ public class ProtectedTagHelperProcessTests
     [Fact]
     public async Task ProcessAsync_PreservesClassAttribute()
     {
-        var helper = new ProtectedTagHelper();
+        var helper = new ProtectedTagHelper(DefaultOptions);
         var attrs = new TagHelperAttributeList { { "class", "protected-lnk" } };
         var output = MakeOutput("user@example.com", attrs);
 
@@ -186,9 +190,21 @@ public class ProtectedTagHelperProcessTests
     }
 
     [Fact]
+    public async Task ProcessAsync_DefaultPlaceholder_UsedFromOptions()
+    {
+        var opts = Options.Create(new CrawlerProtectOptions { DefaultPlaceholder = "[Custom]" });
+        var helper = new ProtectedTagHelper(opts);
+        var output = MakeOutput("secret");
+
+        await helper.ProcessAsync(MakeContext(), output);
+
+        Assert.Equal("[Custom]", output.Content.GetContent());
+    }
+
+    [Fact]
     public async Task ProcessAsync_DataProtectedIsDecodable()
     {
-        var helper = new ProtectedTagHelper();
+        var helper = new ProtectedTagHelper(DefaultOptions);
         var email = "user@example.com";
         var output = MakeOutput(email);
 

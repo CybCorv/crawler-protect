@@ -66,7 +66,17 @@ dotnet add package CrawlerProtect
 Register the TagHelper in `_ViewImports.cshtml`:
 
 ```cshtml
-@addTagHelper CrawlerProtect.ProtectedTagHelper, CrawlerProtect
+@addTagHelper *, CrawlerProtect
+```
+
+Optionally configure defaults in `Program.cs` (if you want to change the placeholder or link target globally):
+
+```csharp
+builder.Services.AddCrawlerProtect(options =>
+{
+    options.DefaultPlaceholder = "...";   // default: "[Protected]"
+    options.DefaultLinkTarget  = "#";     // default: "#"
+});
 ```
 
 ### 2. JavaScript — include the decoder

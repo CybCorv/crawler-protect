@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace CrawlerProtect;
@@ -20,17 +21,23 @@ public class ProtectedTagHelper : TagHelper
 {
     /// <summary>
     /// Text shown in place of the protected content before JavaScript decodes it.
-    /// Defaults to <c>[Protected]</c>.
+    /// Defaults to <see cref="CrawlerProtectOptions.DefaultPlaceholder"/>.
     /// </summary>
     [HtmlAttributeName("placeholder")]
-    public string Placeholder { get; set; } = "[Protected]";
+    public string Placeholder { get; set; }
 
     /// <summary>
     /// Link target used before JavaScript decodes the content.
-    /// Defaults to <c>#</c>.
+    /// Defaults to <see cref="CrawlerProtectOptions.DefaultLinkTarget"/>.
     /// </summary>
     [HtmlAttributeName("href")]
-    public string LinkTarget { get; set; } = "#";
+    public string LinkTarget { get; set; }
+
+    public ProtectedTagHelper(IOptions<CrawlerProtectOptions> options)
+    {
+        Placeholder = options.Value.DefaultPlaceholder;
+        LinkTarget  = options.Value.DefaultLinkTarget;
+    }
 
     /// <inheritdoc/>
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
