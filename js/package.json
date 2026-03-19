@@ -1,0 +1,21 @@
+{
+  "name": "crawler-protect",
+  "version": "1.0.0",
+  "description": "Client-side decoder for crawler-protect XOR-obfuscated content",
+  "main": "dist/decode.js",
+  "types": "dist/decode.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": ["crawler", "obfuscation", "email-protection", "aspnetcore"],
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.0",
+    "jsdom": "^25.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}

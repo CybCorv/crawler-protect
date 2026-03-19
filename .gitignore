@@ -1,0 +1,17 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# JavaScript
+js/node_modules/
+js/dist/
+
+# OS
+.DS_Store
+Thumbs.db

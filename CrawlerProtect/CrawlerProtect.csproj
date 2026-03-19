@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- NuGet metadata -->
+    <PackageId>CrawlerProtect</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Vu0r1</Authors>
+    <Description>ASP.NET Core Tag Helper to obfuscate sensitive content (emails, data) from crawler bots using XOR encoding. Inspired by Cloudflare email obfuscation.</Description>
+    <PackageTags>taghelper;aspnetcore;crawler;obfuscation;email-protection</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/CybCorv/crawler-protect</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
