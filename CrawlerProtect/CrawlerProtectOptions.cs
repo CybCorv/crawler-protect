@@ -46,4 +46,11 @@ public class CrawlerProtectOptions
     /// Must start with <c>data-</c>. Defaults to <c>data-protected</c>.
     /// </summary>
     public string DataAttribute { get; set; } = "data-protected";
+
+    /// <summary>
+    /// Root-relative URL at which the generated JavaScript decoder is served by
+    /// <c>app.MapCrawlerProtectDecoder()</c>. Must start with <c>/</c>.
+    /// Defaults to <c>/crawler-protect.js</c>.
+    /// </summary>
+    public string ScriptPath { get; set; } = "/crawler-protect.js";
 }

@@ -12,8 +12,9 @@ namespace CrawlerProtect;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers CrawlerProtect configuration. Optional — the TagHelper works with
-    /// default values without this call.
+    /// Registers CrawlerProtect configuration and startup validation.
+    /// Optional — the TagHelper works with default values without this call,
+    /// but validation only runs when this method is called.
     /// </summary>
     /// <example>
     /// <code>
@@ -24,6 +25,7 @@ public static class ServiceCollectionExtensions
     ///     options.KeyPosition        = KeyPosition.After;
     ///     options.PayloadEncoding    = PayloadEncoding.Base64;
     ///     options.DataAttribute      = "data-enc";
+    ///     options.ScriptPath         = "/assets/cp.js";
     /// });
     /// </code>
     /// </example>
@@ -36,38 +38,41 @@ public static class ServiceCollectionExtensions
         else
             services.Configure<CrawlerProtectOptions>(configure);
 
+        // Validate options eagerly at startup so misconfiguration surfaces
+        // immediately rather than at the first request.
+        services.AddSingleton<IValidateOptions<CrawlerProtectOptions>,
+                              CrawlerProtectOptionsValidator>();
+
         return services;
     }
 
     /// <summary>
     /// Maps a GET endpoint that serves a JavaScript decoder generated from the
     /// current <see cref="CrawlerProtectOptions"/>. The script is built once at
-    /// startup and cached; it contains the encoding format as baked-in literals
-    /// so each deployment produces a unique decoder.
+    /// startup with all format parameters baked in as literals.
     /// </summary>
-    /// <param name="endpoints">The endpoint route builder.</param>
-    /// <param name="path">
-    /// URL path for the script. Defaults to <c>/crawler-protect.js</c>.
-    /// </param>
+    /// <remarks>
+    /// The endpoint path is taken from <see cref="CrawlerProtectOptions.ScriptPath"/>
+    /// (default <c>/crawler-protect.js</c>).
+    /// </remarks>
     /// <example>
     /// <code>
     /// // Program.cs
     /// app.MapCrawlerProtectDecoder();
     ///
-    /// // _Layout.cshtml
+    /// // _Layout.cshtml — path matches CrawlerProtectOptions.ScriptPath
     /// &lt;script src="/crawler-protect.js"&gt;&lt;/script&gt;
     /// </code>
     /// </example>
     public static IEndpointRouteBuilder MapCrawlerProtectDecoder(
-        this IEndpointRouteBuilder endpoints,
-        string path = "/crawler-protect.js")
+        this IEndpointRouteBuilder endpoints)
     {
         var options = endpoints.ServiceProvider
             .GetRequiredService<IOptions<CrawlerProtectOptions>>().Value;
 
         var js = CrawlerProtectJsGenerator.Generate(options);
 
-        endpoints.MapGet(path, () => Results.Content(js, "application/javascript"));
+        endpoints.MapGet(options.ScriptPath, () => Results.Content(js, "application/javascript"));
 
         return endpoints;
     }

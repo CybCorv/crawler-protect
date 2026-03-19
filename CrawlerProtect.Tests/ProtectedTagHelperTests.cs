@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -469,5 +470,156 @@ public class CrawlerProtectJsGeneratorTests
         });
 
         Assert.NotEqual(jsDefault, jsCustom);
+    }
+}
+
+public class CrawlerProtectOptionsValidatorTests
+{
+    // Builds a ServiceProvider with AddCrawlerProtect and the given configure action,
+    // then accesses IOptions<T>.Value to trigger validation.
+    private static CrawlerProtectOptions BuildOptions(Action<CrawlerProtectOptions> configure)
+    {
+        var services = new ServiceCollection();
+        services.AddCrawlerProtect(configure);
+        return services.BuildServiceProvider()
+                       .GetRequiredService<IOptions<CrawlerProtectOptions>>().Value;
+    }
+
+    // ── Valid configurations ───────────────────────────────────────────────
+
+    [Fact]
+    public void Validate_DefaultOptions_Passes()
+    {
+        // Should not throw
+        var opts = BuildOptions(_ => { });
+        Assert.Equal("*", opts.Separator.ToString());
+    }
+
+    [Fact]
+    public void Validate_CustomValidConfig_Passes()
+    {
+        var opts = BuildOptions(o =>
+        {
+            o.Separator       = '|';
+            o.KeyPosition     = KeyPosition.After;
+            o.PayloadEncoding = PayloadEncoding.Base64;
+            o.DataAttribute   = "data-enc";
+            o.ScriptPath      = "/assets/cp.js";
+        });
+        Assert.Equal('|', opts.Separator);
+    }
+
+    // ── DataAttribute ─────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("protected")]       // missing data- prefix
+    [InlineData("enc")]
+    [InlineData("")]
+    public void Validate_DataAttribute_MissingPrefix_Throws(string attr)
+    {
+        Assert.Throws<OptionsValidationException>(() =>
+            BuildOptions(o => o.DataAttribute = attr));
+    }
+
+    [Theory]
+    [InlineData("data-protected")]
+    [InlineData("data-enc")]
+    [InlineData("data-x")]
+    public void Validate_DataAttribute_ValidPrefix_Passes(string attr)
+    {
+        var opts = BuildOptions(o => o.DataAttribute = attr);
+        Assert.Equal(attr, opts.DataAttribute);
+    }
+
+    // ── Separator vs Hex payload ──────────────────────────────────────────
+
+    [Theory]
+    [InlineData('0')] [InlineData('9')]
+    [InlineData('a')] [InlineData('f')]
+    [InlineData('A')] [InlineData('F')]
+    public void Validate_HexEncoding_HexSeparator_Throws(char sep)
+    {
+        Assert.Throws<OptionsValidationException>(() =>
+            BuildOptions(o =>
+            {
+                o.PayloadEncoding = PayloadEncoding.Hex;
+                o.Separator       = sep;
+            }));
+    }
+
+    [Theory]
+    [InlineData('*')] [InlineData('|')] [InlineData('!')] [InlineData('-')]
+    public void Validate_HexEncoding_SafeSeparator_Passes(char sep)
+    {
+        var opts = BuildOptions(o =>
+        {
+            o.PayloadEncoding = PayloadEncoding.Hex;
+            o.Separator       = sep;
+        });
+        Assert.Equal(sep, opts.Separator);
+    }
+
+    // ── Separator vs Base64 payload ───────────────────────────────────────
+
+    [Theory]
+    [InlineData('A')] [InlineData('z')] [InlineData('0')] [InlineData('9')]
+    [InlineData('+')] [InlineData('/')] [InlineData('=')]
+    public void Validate_Base64Encoding_Base64Separator_Throws(char sep)
+    {
+        Assert.Throws<OptionsValidationException>(() =>
+            BuildOptions(o =>
+            {
+                o.PayloadEncoding = PayloadEncoding.Base64;
+                o.Separator       = sep;
+            }));
+    }
+
+    [Theory]
+    [InlineData('*')] [InlineData('|')] [InlineData('!')] [InlineData('-')]
+    public void Validate_Base64Encoding_SafeSeparator_Passes(char sep)
+    {
+        var opts = BuildOptions(o =>
+        {
+            o.PayloadEncoding = PayloadEncoding.Base64;
+            o.Separator       = sep;
+        });
+        Assert.Equal(sep, opts.Separator);
+    }
+
+    // ── ScriptPath ────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("crawler-protect.js")]   // no leading slash
+    [InlineData("assets/cp.js")]
+    public void Validate_ScriptPath_NoLeadingSlash_Throws(string path)
+    {
+        Assert.Throws<OptionsValidationException>(() =>
+            BuildOptions(o => o.ScriptPath = path));
+    }
+
+    [Theory]
+    [InlineData("/crawler-protect.js")]
+    [InlineData("/assets/cp.js")]
+    public void Validate_ScriptPath_ValidPath_Passes(string path)
+    {
+        var opts = BuildOptions(o => o.ScriptPath = path);
+        Assert.Equal(path, opts.ScriptPath);
+    }
+
+    // ── Multiple errors reported together ────────────────────────────────
+
+    [Fact]
+    public void Validate_MultipleErrors_AllReported()
+    {
+        var ex = Assert.Throws<OptionsValidationException>(() =>
+            BuildOptions(o =>
+            {
+                o.DataAttribute = "bad";          // no data- prefix
+                o.ScriptPath    = "no-slash.js";  // no leading slash
+            }));
+
+        // Both failures should be present in the exception message
+        Assert.Contains("DataAttribute", ex.Message);
+        Assert.Contains("ScriptPath",    ex.Message);
     }
 }
